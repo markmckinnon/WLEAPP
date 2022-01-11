@@ -6,7 +6,13 @@
 import traceback
 
 from scripts.artifacts.betterDiscord import get_betterDiscord
-
+from scripts.artifacts.prefetch import get_prefetch
+from scripts.artifacts.users import get_users
+from scripts.artifacts.bam import get_bam
+from scripts.artifacts.control_sets import get_control_sets
+from scripts.artifacts.network_interfaces import get_network_interfaces
+from scripts.artifacts.sru_application import get_sru_application
+from scripts.artifacts.services import get_services
 
 from scripts.ilapfuncs import *
 
@@ -18,12 +24,19 @@ from scripts.ilapfuncs import *
 # Don't forget to import the module above!!!!
 
 tosearch = {
+    'control_sets': ('Control Sets', ('*/Windows/System32/config/SYSTEM')),
+    'network_interfaces': ('Network Interfaces', ('*/Windows/System32/config/SOFTWARE')),
+    'users':('User Information', ('*/Windows/System32/config/SAM', '*/Windows/System32/config/SOFTWARE')),
     'betterDiscord':('Better Discord', ('*/AppData/Roaming/BetterDiscord/plugins/MessageLoggerV2Data.config.json')),
-    
+ # Program Execution
+    'prefetch':('Program Execution', ('*/Windows/Prefetch/*.pf')),
+    'bam':('Program Execution', ('*/Windows/System32/config/SYSTEM')),
+    'sru_application': ('Program Execution', ('*/Windows/System32/sru/SRUDB.dat')),
+    'services': ('Program Execution', ('*/Windows/System32/config/SYSTEM')),
 }
 slash = '\\' if is_platform_windows() else '/'
 
-def process_artifact(files_found, artifact_func, artifact_name, seeker, report_folder_base, wrap_text):
+def process_artifact(files_found, artifact_func, artifact_name, seeker, report_folder_base, wrap_text, win_parms):
     ''' Perform the common setup for each artifact, ie, 
         1. Create the report folder for it
         2. Fetch the method (function) and call it
@@ -39,6 +52,8 @@ def process_artifact(files_found, artifact_func, artifact_name, seeker, report_f
             seeker: FileSeeker object to pass to method
             
             wrap_text: whether the text data will be wrapped or not using textwrap.  Useful for tools that want to parse the data.
+
+            win_parms: Windows parmameters what can be passed around to different artifacts (ie: username/sid)
     '''
     logfunc('{} [{}] artifact executing'.format(artifact_name, artifact_func))
     report_folder = os.path.join(report_folder_base, artifact_name) + slash
@@ -54,7 +69,7 @@ def process_artifact(files_found, artifact_func, artifact_name, seeker, report_f
         return
     try:
         method = globals()['get_' + artifact_func]
-        method(files_found, report_folder, seeker, wrap_text)
+        method(files_found, report_folder, seeker, wrap_text, win_parms)
     except Exception as ex:
         logfunc('Reading {} artifact had errors!'.format(artifact_name))
         logfunc('Error was {}'.format(str(ex)))

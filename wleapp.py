@@ -81,6 +81,7 @@ def main():
 
 def crunch_artifacts(search_list, extracttype, input_path, out_params, ratio, wrap_text):
     start = process_time()
+    win_parms = windowsParameters()
 
     logfunc('Processing started. Please wait. This may take a few minutes...')
 
@@ -142,7 +143,7 @@ def crunch_artifacts(search_list, extracttype, input_path, out_params, ratio, wr
                 files_found.extend(found)
         if files_found:
             logfunc()
-            process_artifact(files_found, key, artifact_pretty_name, seeker, out_params.report_folder_base, wrap_text)
+            process_artifact(files_found, key, artifact_pretty_name, seeker, out_params.report_folder_base, wrap_text, win_parms)
             for pathh in files_found:
                 if pathh.startswith('\\\\?\\'):
                     pathh = pathh[4:]

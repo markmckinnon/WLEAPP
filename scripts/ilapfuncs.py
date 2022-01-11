@@ -9,16 +9,49 @@ import sys
 import simplekml
 import magic
 import shutil
+import struct
 from pathlib import Path
 
 from bs4 import BeautifulSoup
+
+user_name_dict = {}
+current_control_set = 0
+
+class windowsParameters:
+    "these are parameters that can be passed around to different modules of data to use"
+
+    def __init__(self):
+        self.user_name_dict = {}
+        self.current_control_set = 0
+        self.network_interfaces = {}
+
+    def set_control_set(self, current_control_set):
+        self.current_control_set = current_control_set
+
+    def get_control_set(self):
+        return 'ControlSet00' + str(self.current_control_set)
+
+    def add_network_interface(self, profile_index, channel_name):
+        self.network_interfaces[profile_index] = channel_name
+
+    def get_network_interface(self, profile_index, channel_name):
+        return self.network_interfaces[profile_index]
+
+    def add_user_sid(self, user_sid, user_name):
+        self.user_name_dict[user_sid] = user_name
+
+    def get_user_sids(self):
+        return self.user_name_dict
+
+    def get_user_sid(self, sid):
+        return self.user_name_dict.get(sid, sid)
 
 class OutputParameters:
     '''Defines the parameters that are common for '''
     # static parameters
     nl = '\n'
     screen_output_file_path = ''
-    
+
     def __init__(self, output_folder):
         now = datetime.datetime.now()
         currenttime = str(now.strftime('%Y-%m-%d_%A_%H%M%S'))
@@ -190,7 +223,7 @@ def tsv(report_folder, data_headers, data_list, tsvname, source_file=None):
         os.makedirs(tsv_report_folder)
 
     if os.path.exists(os.path.join(tsv_report_folder, tsvname +'.tsv')):
-        with codecs.open(os.path.join(tsv_report_folder, tsvname +'.tsv'), 'a') as tsvfile:
+        with codecs.open(os.path.join(tsv_report_folder, tsvname +'.tsv'), 'a', encoding="utf-8") as tsvfile:
             tsv_writer = csv.writer(tsvfile, delimiter='\t')
             for i in data_list:
                 if source_file == None:
@@ -503,4 +536,53 @@ def ipgen(report_folder, data_list_ipaddress):
         a += 1
     db.commit()
     db.close()
-    
+
+
+def binary_sid_to_string(sid_str):
+    #Original form Source: https://github.com/google/grr/blob/master/grr/parsers/wmi_parser.py
+    """Converts a binary SID to its string representation.
+     https://msdn.microsoft.com/en-us/library/windows/desktop/aa379597.aspx
+    The byte representation of an SID is as follows:
+      Offset  Length  Description
+      00      01      revision
+      01      01      sub-authority count
+      02      06      authority (big endian)
+      08      04      subauthority #1 (little endian)
+      0b      04      subauthority #2 (little endian)
+      ...
+    Args:
+      sid: A byte array.
+    Returns:
+      SID in string form.
+    Raises:
+      ValueError: If the binary SID is malformed.
+    """
+    if not sid_str:
+        return ""
+#    sid = codecs.decode(sid_str,"hex")
+    #print (sid_str)
+    sid = sid_str
+    str_sid_components = [sid[0]]
+    # Now decode the 48-byte portion
+    if len(sid) >= 8:
+        subauthority_count = sid[1]
+        identifier_authority = struct.unpack(">H", sid[2:4])[0]
+        identifier_authority <<= 32
+        identifier_authority |= struct.unpack(">L", sid[4:8])[0]
+        str_sid_components.append(identifier_authority)
+        start = 8
+        for i in range(subauthority_count):
+            authority = sid[start:start + 4]
+            if not authority:
+                break
+            if len(authority) < 4:
+                raise ValueError("In binary SID '%s', component %d has been truncated. "
+                         "Expected 4 bytes, found %d: (%s)",
+                         ",".join([str(ord(c)) for c in sid]), i,
+                         len(authority), authority)
+            str_sid_components.append(struct.unpack("<L", authority)[0])
+            start += 4
+            sid_str = "S-%s" % ("-".join([str(x) for x in str_sid_components]))
+    sid_name = sid_str
+    return sid_name
+
